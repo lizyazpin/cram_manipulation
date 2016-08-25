@@ -47,9 +47,25 @@
     ;; Update goal-specs
     #:enriched-goal-specification
     ;; Utils for querying arm knowledge
+    #:arms
+    #:arm-base-joint-names
     #:eef-link-name
+    #:base-link-name
     #:planning-group-name
     #:arm-link-names
+    #:arm-joint-names
+    #:arm-base-joint-names
+    #:arm-tool-joint-names
+    #:arm-base-link-names
+    #:manipulation-joint-names
+    #:joint-upper-limit
+    #:joint-lower-limit
+    #:joint-type
+    #:joint-origin
+    #:joint-axis
+    #:joint-parent
+    #:joint-child
+    #:joint-arm
     #:hand-link-names
     #:object-names-in-hand))
 

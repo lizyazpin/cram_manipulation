@@ -40,4 +40,8 @@
   ((:module "src"
             :components
             ((:file "package")
-             (:file "giskard-manager" :depends-on ("package"))))))
+             (:file "failures" :depends-on ("package"))
+             (:file "simple-mode" :depends-on ("package" "failures"))
+             (:file "yaml-builder" :depends-on ("package"))
+             (:file "yaml-mode" :depends-on ("package" "failures" "yaml-builder"))
+             (:file "giskard-manager" :depends-on ("package" "yaml-builder" "yaml-mode" "simple-mode"))))))

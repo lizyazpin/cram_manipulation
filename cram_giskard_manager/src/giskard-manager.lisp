@@ -38,9 +38,36 @@
   (apply #'make-instance (cons 'giskard-goal-specification args)))
 
 (defmethod mot-man:execute-arm-action ((goal-specification giskard-goal-specification))
-  ;; TODO: add an interpretation of the goal spec, and appropriate giskard calls, here.
-  ;; For now, just fall-back to whatever the fallback is
-  (call-fallback goal-specification))
+  (let* ((keys (keys goal-specification))
+         (timeout (cadr (assoc :timeout keys)))
+         (timeout (if timeout
+                    timeout
+                    0))
+         (yaml (cadr (assoc :yaml keys)))
+         (thresholds (cadr (assoc :thresholds keys)))
+         (additional-vars (cadr (assoc :additional-vars keys)))
+         (soft-constraints (cadr (assoc :soft-constraints keys)))
+         (run-simple-mode (and (not yaml) (not soft-constraints)))
+         (run-given-yaml-mode (and yaml))
+         (run-spliced-yaml-mode (and soft-constraints))
+         (motion-result
+           (block run-giskard
+             (cpl-impl:with-failure-handling
+               ((giskard-failure (f)
+                  (declare (ignore f))
+                  (return-from run-giskard nil)))
+               (cond
+                 (run-simple-mode
+                   (giskard-simple-mode-execution goal-specification))
+                 (run-given-yaml-mode
+                   (giskard-yaml-execution yaml thresholds timeout))
+                 (run-spliced-yaml-mode
+                   (splice-and-execute-yaml additional-vars soft-constraints thresholds timeout))
+                 (T
+                   (error 'bad-goal-spec)))))))
+    (if motion-result
+      motion-result
+      (call-fallback goal-specification))))
 
 (defun fallback-to-giskard (goal-spec)
   (copy-goal-specification goal-spec 'giskard-goal-specification))
