@@ -33,6 +33,8 @@
   :depends-on (cram-language
                cram-designators
                cram-plan-failures
+               cram-robot-interfaces
+               alexandria
                cram-prolog
                cram-utilities
                cram-moveit)
