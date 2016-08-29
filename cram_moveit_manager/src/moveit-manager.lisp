@@ -169,7 +169,7 @@
                  (let* ((arm (side arm-goals))
                         (link-name (arm-link arm-goals))
                         (poses (poses arm-goals))
-                        (raise-elbow (if (find arm raised-elbows) T nil))
+                        (raise-elbow (if (find arm raised-elbows) arm nil))
                         (touch-links (arm-link-names arm))
                         (object-names-in-hand (object-names-in-hand arm))
                         (hand-link-names (hand-link-names arm)))
