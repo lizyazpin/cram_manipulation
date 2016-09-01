@@ -72,7 +72,15 @@
     (< (abs (cl-transforms:angle-between-quaternions goal-q start-q)) 0.1)))
 
 (defun plan-trajectory (side link-name pose-stamped ignore-collisions allowed-collision-objects collidable-objects max-tilt raise-elbow start-state touch-links object-names-in-hand hand-link-names)
-  (let* ((planning-group (planning-group-name side))
+  (let* ((goal-frame (cl-transforms-stamped:frame-id pose-stamped))
+         ;;;; !!!! Replace with a call to the robot-odom-frame predicate.
+         (odom-frame "odom_combined")
+         (g2o (cl-tf:lookup-transform cram-moveit::*transformer* odom-frame goal-frame))
+         (pose-goal (cl-transforms-stamped:transform-pose g2o pose-stamped))
+         (pose-stamped (cl-transforms-stamped:make-pose-stamped odom-frame 0
+                                                                (cl-transforms:origin pose-goal)
+                                                                (cl-transforms:orientation pose-goal)))
+         (planning-group (planning-group-name side))
          (log-id (first (cram-language::on-prepare-move-arm
                           link-name pose-stamped
                           planning-group ignore-collisions)))
