@@ -149,10 +149,12 @@
                                       start-state
                                       planning-group
                                       link-name
-                                      (list (cl-transforms-stamped:make-pose-stamped-msg
-                                              pose-stamped
-                                              (cl-transforms-stamped:frame-id pose-stamped)
-                                              (cl-transforms-stamped:stamp pose-stamped)))
+                                      (list (roslisp:with-fields (pose)
+                                              (cl-transforms-stamped:make-pose-stamped-msg
+                                                pose-stamped
+                                                (cl-transforms-stamped:frame-id pose-stamped)
+                                                (cl-transforms-stamped:stamp pose-stamped))
+                                              pose))
                                       0.1
                                       1.5
                                       (not ignore-collisions)))
@@ -160,6 +162,7 @@
                             (completion (second (third result)))
                             (trajectory (second (second result))))
                        (declare (ignore dummy) (ignore dummy2))
+                       (format t "TRIED CARTESIAN PATH, GOT COMPLETION ~a~%" completion)
                        (if (< 0.99 completion)
                          trajectory))) 
                 (multiple-value-bind (start trajectory)
