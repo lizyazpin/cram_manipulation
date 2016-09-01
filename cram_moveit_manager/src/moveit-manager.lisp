@@ -47,8 +47,22 @@
          (unique-arms (remove-duplicates arms)))
     (equal (length unique-arms) (length arms))))
 
+(defun ps-msg->pose-stamped (msg)
+  (roslisp:with-fields ((frame (frame_id header))
+                        (stamp (stamp header))
+                        (x (x position pose))
+                        (y (y position pose))
+                        (z (z position pose))
+                        (qx (x orientation pose))
+                        (qy (y orientation pose))
+                        (qz (z orientation pose))
+                        (qw (w orientation pose))) msg
+    (cl-transforms-stamped:make-pose-stamped frame stamp
+                                             (cl-transforms:make-3d-vector x y z)
+                                             (cl-transforms:make-quaternion qx qy qz qw))))
+
 (defun start-goal-aligned (link-name robot-state goal-pose)
-  (let* ((link-pose (second (cram-moveit:compute-fk (list link-name) :robot-state robot-state)))
+  (let* ((link-pose (ps-msg->pose-stamped (second (car (cram-moveit:compute-fk (list link-name) :robot-state robot-state)))))
          (goal-q (cl-transforms:orientation goal-pose))
          (start-q (cl-transforms:orientation link-pose))
          (goal-frame (cl-transforms-stamped:frame-id goal-pose))
@@ -127,7 +141,10 @@
                                       start-state
                                       planning-group
                                       link-name
-                                      (list pose-stamped)
+                                      (list (cl-transforms-stamped:make-pose-stamped-msg
+                                              pose-stamped
+                                              (cl-transforms-stamped:frame-id pose-stamped)
+                                              (cl-transforms-stamped:stamp pose-stamped)))
                                       0.1
                                       1.5
                                       (not ignore-collisions)))
