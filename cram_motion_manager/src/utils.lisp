@@ -198,3 +198,8 @@
                                  objects-in-hand))))
     object-names-in-hand))
 
+(defun strip-slash (str)
+  (if (equal #\/ (char str 0))
+    (strip-slash (subseq str 1))
+    str))
+
