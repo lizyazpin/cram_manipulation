@@ -67,5 +67,6 @@
     #:joint-child
     #:joint-arm
     #:hand-link-names
-    #:object-names-in-hand))
+    #:object-names-in-hand
+    #:strip-slash))
 
