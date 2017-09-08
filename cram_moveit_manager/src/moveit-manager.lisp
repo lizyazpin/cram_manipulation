@@ -47,11 +47,46 @@
          (unique-arms (remove-duplicates arms)))
     (equal (length unique-arms) (length arms))))
 
+(defun ps-msg->pose-stamped (msg)
+  (roslisp:with-fields ((frame (frame_id header))
+                        (stamp (stamp header))
+                        (x (x position pose))
+                        (y (y position pose))
+                        (z (z position pose))
+                        (qx (x orientation pose))
+                        (qy (y orientation pose))
+                        (qz (z orientation pose))
+                        (qw (w orientation pose))) msg
+    (cl-transforms-stamped:make-pose-stamped frame stamp
+                                             (cl-transforms:make-3d-vector x y z)
+                                             (cl-transforms:make-quaternion qx qy qz qw))))
+
+(defun start-goal-aligned (link-name robot-state goal-pose)
+  (let* ((link-pose (ps-msg->pose-stamped (second (car (cram-moveit:compute-fk (list link-name) :robot-state robot-state)))))
+         (goal-q (cl-transforms:orientation goal-pose))
+         (start-q (cl-transforms:orientation link-pose))
+         (goal-frame (cl-transforms-stamped:frame-id goal-pose))
+         (start-frame (cl-transforms-stamped:frame-id link-pose))
+         (s2g-tran (cl-tf::lookup-transform cram-moveit::*transformer* (strip-slash goal-frame) (strip-slash start-frame)))
+         (start-q (cl-transforms:q* (cl-transforms:rotation s2g-tran) start-q)))
+    (< (abs (cl-transforms:angle-between-quaternions goal-q start-q)) 0.1)))
+
 (defun plan-trajectory (side link-name pose-stamped ignore-collisions allowed-collision-objects collidable-objects max-tilt raise-elbow start-state touch-links object-names-in-hand hand-link-names)
-  (let* ((planning-group (planning-group-name side))
+  (let* ((goal-frame (cl-transforms-stamped:frame-id pose-stamped))
+         ;;;; !!!! Replace with a call to the robot-odom-frame predicate.
+         (odom-frame "odom_combined")
+         (g2o (cl-tf:lookup-transform cram-moveit::*transformer* (strip-slash odom-frame) (strip-slash goal-frame)))
+         (pose-goal (cl-transforms-stamped:transform-pose g2o pose-stamped))
+         (pose-stamped (cl-transforms-stamped:make-pose-stamped odom-frame 0
+                                                                (cl-transforms:origin pose-goal)
+                                                                (cl-transforms:orientation pose-goal)))
+         (planning-group (planning-group-name side))
          (log-id (first (cram-language::on-prepare-move-arm
                           link-name pose-stamped
                           planning-group ignore-collisions)))
+         (start-state (if (not start-state)
+                        (second (first (cram-moveit:get-planning-scene-info :robot-state T)))
+                        start-state))
          (result nil))
     (cpl-impl:with-failure-handling
       ((moveit:no-ik-solution (f)
@@ -91,28 +126,67 @@
          (error 'cram-plan-failures:manipulation-pose-unreachable
                 :result (list side pose-stamped))))
       (setf result
-            (multiple-value-bind (start trajectory)
-                                 (moveit:move-link-pose
-                                   link-name
-                                   planning-group
-                                   pose-stamped
-                                   :ignore-collisions ignore-collisions
-                                   :allowed-collision-objects allowed-collision-objects
-                                   :collidable-objects collidable-objects
-                                   :max-tilt max-tilt
-                                   :raise-elbow raise-elbow
-                                   :start-state start-state
-                                   :touch-links touch-links
-                                   :additional-touch-link-groups
-                                   (when object-names-in-hand `(,object-names-in-hand))
-                                   :additional-collision-objects-groups
-                                   (when hand-link-names `(,hand-link-names))
-                                   :plan-only t
-                                   :additional-values
-                                   (when object-names-in-hand `(t)))
-              (declare (ignorable start))
-              (cram-language::on-finish-move-arm log-id t)
-              trajectory)))))
+            (or (and (start-goal-aligned link-name start-state pose-stamped)
+                     (let* ((ps-acm (second (first (moveit:get-planning-scene-info :allowed-collision-matrix t))))
+                            (tk-acm (moveit::relative-collision-matrix
+                                      (append
+                                        `(,touch-links
+                                          ,collidable-objects)
+                                        (when object-names-in-hand `(,object-names-in-hand)))
+                                      (append
+                                        `(,allowed-collision-objects
+                                          ,(when collidable-objects
+                                             (loop for obj in moveit::*known-collision-objects*
+                                               collect (slot-value obj 'name))))
+                                        (when hand-link-names `(,hand-link-names)))
+                                      (append
+                                        `(t t)
+                                        (when object-names-in-hand `(t)))))
+                            (tk-acm (moveit::combine-collision-matrices (list tk-acm ps-acm)))
+                            (dummy (moveit:set-planning-scene-collision-matrix tk-acm))
+                            (result (moveit:compute-cartesian-path
+                                      (cl-transforms-stamped:frame-id pose-stamped)
+                                      start-state
+                                      planning-group
+                                      link-name
+                                      (list (roslisp:with-fields (pose)
+                                              (cl-transforms-stamped:make-pose-stamped-msg
+                                                pose-stamped
+                                                (cl-transforms-stamped:frame-id pose-stamped)
+                                                (cl-transforms-stamped:stamp pose-stamped))
+                                              pose))
+                                      0.1
+                                      1.5
+                                      (not ignore-collisions)))
+                            (dummy2 (moveit:set-planning-scene-collision-matrix ps-acm))
+                            (completion (second (third result)))
+                            (trajectory (second (second result))))
+                       (declare (ignore dummy) (ignore dummy2))
+                       (format t "TRIED CARTESIAN PATH, GOT COMPLETION ~a~%" completion)
+                       (if (< 0.99 completion)
+                         trajectory))) 
+                (multiple-value-bind (start trajectory)
+                                     (moveit:move-link-pose
+                                       link-name
+                                       planning-group
+                                       pose-stamped
+                                       :ignore-collisions ignore-collisions
+                                       :allowed-collision-objects allowed-collision-objects
+                                       :collidable-objects collidable-objects
+                                       :max-tilt max-tilt
+                                       :raise-elbow raise-elbow
+                                       :start-state start-state
+                                       :touch-links touch-links
+                                       :additional-touch-link-groups
+                                         (when object-names-in-hand `(,object-names-in-hand))
+                                       :additional-collision-objects-groups
+                                         (when hand-link-names `(,hand-link-names))
+                                       :plan-only t
+                                       :additional-values
+                                         (when object-names-in-hand `(t)))
+                  (declare (ignorable start))
+                  (cram-language::on-finish-move-arm log-id t)
+                  trajectory))))))
 
 (defun plan-trajectory-sequence (side link-name poses ignore-collisions allowed-collision-objects collidable-objects max-tilt raise-elbow)
   (let* ((touch-links (arm-link-names side))
