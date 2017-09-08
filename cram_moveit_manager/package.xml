@@ -17,7 +17,7 @@
 
   <!-- Dependencies needed to compile this package. -->
   <build_depend>cram_language</build_depend>
-  <build_depend>cram_plan_failures</build_depend>
+  <build_depend>cram_common_failures</build_depend>
   <build_depend>cram_prolog</build_depend>
   <build_depend>cram_utilities</build_depend>
   <build_depend>cram_moveit</build_depend>
@@ -25,7 +25,7 @@
   
   <!-- Dependencies needed after this package is compiled. -->
   <run_depend>cram_language</run_depend>
-  <run_depend>cram_plan_failures</run_depend>
+  <run_depend>cram_common_failures</run_depend>
   <run_depend>cram_prolog</run_depend>
   <run_depend>cram_utilities</run_depend>
   <run_depend>cram_moveit</run_depend>

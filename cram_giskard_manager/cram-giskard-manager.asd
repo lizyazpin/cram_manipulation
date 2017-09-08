@@ -31,7 +31,7 @@
   :license "BSD"
 
   :depends-on (cram-language
-               cram-plan-failures
+               cram-common-failures
                cram-prolog
                cram-utilities
                cl-giskard
