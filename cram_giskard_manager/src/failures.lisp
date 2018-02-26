@@ -28,7 +28,7 @@
 
 (in-package :cram-giskard-manager)
 
-(define-condition giskard-failure (cram-plan-failures:manipulation-failure) ())
+(define-condition giskard-failure (cram-common-failures:manipulation-failure) ())
 
 (define-condition bad-goal-spec (giskard-failure) ())
 
